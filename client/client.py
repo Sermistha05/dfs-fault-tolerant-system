@@ -1,7 +1,12 @@
+#this file is the client interface for uploading and downloading files to/from the DFS. It interacts with the 
+#master to get node info and with storage nodes to store/fetch chunks. The upload/download logic is not fully 
+#implemented yet, but the structure is in place for future development.
+# The client uses httpx for HTTP requests and relies on the common utils for chunking and reassembly.
+# The client can be extended to include features like progress tracking, retry logic, and more sophisticated 
+# node selection strategies.
 import logging
 from pathlib import Path
 from typing import List
-
 import httpx
 
 from common.utils import chunk_file, reassemble_chunks
