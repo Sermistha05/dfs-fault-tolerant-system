@@ -7,6 +7,7 @@ class ChunkInfo:
     chunk_id: str
     node_id: str
     node_address: str
+    size: int = 0
 
 
 @dataclass
