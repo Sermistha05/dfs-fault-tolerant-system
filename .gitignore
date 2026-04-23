@@ -29,3 +29,14 @@ desktop.ini
 # Env files
 .env
 *.env
+
+
+# Ignore storage data
+storage_node/data/
+
+# Ignore runtime JSON files
+master/nodes.json
+master/files.json
+
+# Ignore cache
+__pycache__/
