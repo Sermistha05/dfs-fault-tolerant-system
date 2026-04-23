@@ -32,6 +32,9 @@ class MetadataStore:
     def get_nodes(self) -> Dict[str, str]:
         return dict(self._nodes)
 
+    def update_node(self, node_id: str, address: str) -> None:
+        self._nodes[node_id] = address
+
     def remove_node(self, node_id: str) -> None:
         self._nodes.pop(node_id, None)
 

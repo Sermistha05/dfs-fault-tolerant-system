@@ -19,9 +19,31 @@ def health_check():
 
 @app.post("/register_node")
 def register_node(node_id: str, address: str):
+    if node_id in metadata.get_nodes():
+        raise HTTPException(status_code=409, detail=f"Node '{node_id}' is already registered")
     metadata.add_node(node_id, address)
     logger.info("Registered storage node: %s at %s", node_id, address)
     return {"status": "registered", "node_id": node_id, "address": address}
+
+
+@app.delete("/delete_node/{node_id}")
+def delete_node(node_id: str):
+    if node_id not in metadata.get_nodes():
+        raise HTTPException(status_code=404, detail=f"Node '{node_id}' not found")
+    metadata.remove_node(node_id)
+    logger.info("Deleted storage node: %s", node_id.replace("\n", "").replace("\r", ""))
+    return {"status": "deleted", "node_id": node_id}
+
+
+@app.put("/update_node/{node_id}")
+def update_node(node_id: str, address: str):
+    if node_id not in metadata.get_nodes():
+        raise HTTPException(status_code=404, detail=f"Node '{node_id}' not found")
+    metadata.update_node(node_id, address)
+    logger.info("Updated storage node: %s → %s",
+                node_id.replace("\n", "").replace("\r", ""),
+                address.replace("\n", "").replace("\r", ""))
+    return {"status": "updated", "node_id": node_id, "address": address}
 
 
 @app.get("/nodes")

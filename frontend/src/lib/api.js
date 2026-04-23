@@ -7,6 +7,10 @@ export const getNodes     = ()                   => api.get('/nodes')
 export const getFiles     = ()                   => api.get('/files')
 export const registerNode = (node_id, address)   =>
   api.post('/register_node', null, { params: { node_id, address } })
+export const deleteNode   = (node_id)             =>
+  api.delete(`/delete_node/${encodeURIComponent(node_id)}`)
+export const updateNode   = (node_id, address)    =>
+  api.put(`/update_node/${encodeURIComponent(node_id)}`, null, { params: { address } })
 export const uploadFile = (formData, onUploadProgress) =>
   api.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

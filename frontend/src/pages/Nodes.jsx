@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
-import { getNodes, registerNode, pingNode } from '../lib/api'
+import { getNodes, registerNode, pingNode, deleteNode, updateNode } from '../lib/api'
 import Card from '../components/Card'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ function StatusBadge({ status }) {
   )
 }
 
-function NodeCard({ nodeId, address, status, onRecheck }) {
+function NodeCard({ nodeId, address, status, onRecheck, onEdit, onDelete }) {
   return (
     <div className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/20 hover:border-indigo-200 dark:hover:border-indigo-700 transition-colors group">
       {/* Icon */}
@@ -56,7 +56,7 @@ function NodeCard({ nodeId, address, status, onRecheck }) {
         <p className="text-xs text-gray-400 truncate mt-0.5">{address}</p>
       </div>
 
-      {/* Status + recheck */}
+      {/* Status + actions */}
       <div className="flex items-center gap-2 shrink-0">
         <StatusBadge status={status} />
         <button
@@ -66,6 +66,72 @@ function NodeCard({ nodeId, address, status, onRecheck }) {
         >
           ↺
         </button>
+        <button
+          onClick={onEdit}
+          title="Edit node"
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-indigo-500 text-sm p-1 rounded"
+        >
+          ✎
+        </button>
+        <button
+          onClick={onDelete}
+          title="Delete node"
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500 text-sm p-1 rounded"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── edit modal ────────────────────────────────────────────────────────────────
+function EditModal({ nodeId, currentAddress, onClose, onSave }) {
+  const [addr, setAddr] = useState(currentAddress)
+  const [err, setErr]   = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!addr.trim()) { setErr('Address is required.'); return }
+    try { new URL(addr) } catch { setErr('Enter a valid URL.'); return }
+    setSaving(true)
+    try {
+      await onSave(addr.trim())
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 w-full max-w-sm flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-100 text-sm">Edit Node <span className="font-mono text-indigo-500">{nodeId}</span></h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg">✕</button>
+        </div>
+        <Field
+          label="New Address"
+          value={addr}
+          onChange={e => { setAddr(e.target.value); setErr('') }}
+          placeholder="e.g. http://localhost:8002"
+          error={err}
+          type="url"
+        />
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onClose}
+            className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold transition-colors"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -93,7 +159,10 @@ function Field({ label, value, onChange, placeholder, error, ...rest }) {
 // ── main component ────────────────────────────────────────────────────────────
 export default function Nodes() {
   // node map: { [nodeId]: { address, status: 'checking'|'active'|'inactive' } }
-  const [nodes, setNodes]       = useReducer((s, patch) => ({ ...s, ...patch }), {})
+  const [nodes, setNodes] = useReducer(
+    (s, patch) => typeof patch === 'function' ? patch(s) : { ...s, ...patch },
+    {}
+  )
   const [loading, setLoading]   = useState(true)
   const [fetchErr, setFetchErr] = useState(null)
 
@@ -180,6 +249,36 @@ export default function Nodes() {
     pingNode(addr)
       .then(() => setNodes({ [id]: { address: addr, status: 'active' } }))
       .catch(() => setNodes({ [id]: { address: addr, status: 'inactive' } }))
+  }
+
+  // ── delete ────────────────────────────────────────────────────────────────
+  const handleDelete = async (id) => {
+    if (!window.confirm(`Delete node "${id}"? This cannot be undone.`)) return
+    try {
+      await deleteNode(id)
+      setNodes(prev => { const next = { ...prev }; delete next[id]; return next })
+      showToast('success', `Node "${id}" deleted.`)
+    } catch (err) {
+      showToast('error', err.response?.data?.detail ?? 'Delete failed.')
+    }
+  }
+
+  // ── edit ──────────────────────────────────────────────────────────────────
+  const [editTarget, setEditTarget] = useState(null) // { id, address }
+
+  const handleEditSave = async (newAddr) => {
+    const { id } = editTarget
+    try {
+      await updateNode(id, newAddr)
+      setNodes({ [id]: { address: newAddr, status: 'checking' } })
+      pingNode(newAddr)
+        .then(() => setNodes({ [id]: { address: newAddr, status: 'active' } }))
+        .catch(() => setNodes({ [id]: { address: newAddr, status: 'inactive' } }))
+      showToast('success', `Node "${id}" updated.`)
+      setEditTarget(null)
+    } catch (err) {
+      showToast('error', err.response?.data?.detail ?? 'Update failed.')
+    }
   }
 
   const nodeList   = Object.entries(nodes)
@@ -304,11 +403,23 @@ export default function Nodes() {
                 address={addr}
                 status={status}
                 onRecheck={() => recheck(id, addr)}
+                onEdit={() => setEditTarget({ id, address: addr })}
+                onDelete={() => handleDelete(id)}
               />
             ))}
           </div>
         )}
       </Card>
+
+      {/* Edit modal */}
+      {editTarget && (
+        <EditModal
+          nodeId={editTarget.id}
+          currentAddress={editTarget.address}
+          onClose={() => setEditTarget(null)}
+          onSave={handleEditSave}
+        />
+      )}
 
     </div>
   )
