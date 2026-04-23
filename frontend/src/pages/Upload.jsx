@@ -240,10 +240,10 @@ export default function Upload() {
               </p>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
                 {[
-                  ['File',    result.chunk_id],
+                  ['File',    result.node_id],
                   ['Node',    result.node],
-                  ['Status',  result.storage?.status],
-                  ['Size',    result.storage?.size != null ? formatBytes(result.storage.size) : undefined],
+                  ['Status',  result.status],
+                  ['Size',    result.size != null ? formatBytes(result.size) : undefined],
                 ].filter(([, v]) => v != null).map(([label, value]) => (
                   <>
                     <dt key={`dt-${label}`} className="text-gray-400 font-medium">{label}</dt>

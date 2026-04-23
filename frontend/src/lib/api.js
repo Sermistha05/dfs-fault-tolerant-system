@@ -2,6 +2,7 @@ import axios from 'axios'
 
 const api = axios.create({ baseURL: '/api' })
 
+export const getStats     = ()                   => api.get('/stats')
 export const getHealth    = ()                   => api.get('/')
 export const getNodes     = ()                   => api.get('/nodes')
 export const getFiles     = ()                   => api.get('/files')

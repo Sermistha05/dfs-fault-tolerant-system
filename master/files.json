@@ -1,0 +1,46 @@
+{
+  "7.jpeg": {
+    "total_chunks": 1,
+    "chunks": [
+      {
+        "chunk_id": "7.jpeg",
+        "node_id": "node1",
+        "node_address": "http://127.0.0.1:8001",
+        "size": 303910
+      }
+    ]
+  },
+  "8 (2).jpeg": {
+    "total_chunks": 1,
+    "chunks": [
+      {
+        "chunk_id": "8 (2).jpeg",
+        "node_id": "node2",
+        "node_address": "http://127.0.0.1:8002",
+        "size": 318949
+      }
+    ]
+  },
+  "9 (2).jpeg": {
+    "total_chunks": 1,
+    "chunks": [
+      {
+        "chunk_id": "9 (2).jpeg",
+        "node_id": "node3",
+        "node_address": "http://127.0.0.1:8003",
+        "size": 354385
+      }
+    ]
+  },
+  "6.jpeg": {
+    "total_chunks": 1,
+    "chunks": [
+      {
+        "chunk_id": "6.jpeg",
+        "node_id": "node1",
+        "node_address": "http://127.0.0.1:8001",
+        "size": 345735
+      }
+    ]
+  }
+}

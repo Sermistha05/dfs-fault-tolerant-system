@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="DFS Master Node")
 metadata = MetadataStore()
+node_index = 0
 
 
 @app.get("/")
@@ -51,6 +52,21 @@ def list_nodes():
     return {"nodes": metadata.get_nodes()}
 
 
+@app.get("/stats")
+def get_stats():
+    stats = metadata.get_stats()
+    nodes = metadata.get_nodes()
+    active_nodes = 0
+    for address in nodes.values():
+        try:
+            r = httpx.get(f"{address}/", timeout=2)
+            if r.status_code == 200:
+                active_nodes += 1
+        except httpx.HTTPError:
+            pass
+    return {**stats, "active_nodes": active_nodes}
+
+
 @app.get("/files")
 def list_files():
     return {"files": metadata.get_files()}
@@ -65,8 +81,13 @@ async def upload_file(file: UploadFile = File(...)):
     content = await file.read()
     chunk_id = file.filename
 
-    # Pick the first registered node
-    node_id, node_address = next(iter(nodes.items()))
+    # Round-robin node selection
+    global node_index
+    node_ids = list(nodes.keys())
+    selected_node_id = node_ids[node_index % len(node_ids)]
+    node_index += 1
+    node_id, node_address = selected_node_id, nodes[selected_node_id]
+    print("Selected Node:", selected_node_id)
 
     try:
         response = httpx.post(
@@ -80,7 +101,8 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=502, detail=f"Storage node error: {e}")
 
     # Record metadata
-    chunk_size = response.json().get("size", len(content))
+    storage_response = response.json()
+    chunk_size = storage_response.get("size", len(content))
     file_meta = FileMetadata(
         filename=file.filename,
         total_chunks=1,
@@ -89,7 +111,13 @@ async def upload_file(file: UploadFile = File(...)):
     metadata.add_file(file_meta)
     logger.info("Uploaded '%s' → node %s (%s)", file.filename, node_id, node_address)
 
-    return {"message": "File uploaded", "chunk_id": chunk_id, "node": node_address, "storage": response.json()}
+    return {
+        "message": "File uploaded",
+        "node_id": node_id,
+        "node": node_address,
+        "status": storage_response.get("status", "stored"),
+        "size": chunk_size,
+    }
 
 
 @app.get("/download/{filename}")
