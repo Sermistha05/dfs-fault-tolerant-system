@@ -4,6 +4,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, UploadFile, File
 
 from master.metadata import MetadataStore, FileMetadata, ChunkInfo
+from common.utils import split_bytes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -79,69 +80,69 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=503, detail="No storage nodes available")
 
     content = await file.read()
-    chunk_id = file.filename
-
-    # Round-robin node selection
-    global node_index
+    chunks  = split_bytes(file.filename, content)
     node_ids = list(nodes.keys())
-    selected_node_id = node_ids[node_index % len(node_ids)]
-    node_index += 1
-    node_id, node_address = selected_node_id, nodes[selected_node_id]
-    print("Selected Node:", selected_node_id)
 
-    try:
-        response = httpx.post(
-            f"{node_address}/store_chunk",
-            params={"chunk_id": chunk_id},
-            files={"file": (file.filename, content, "application/octet-stream")},
-        )
-        response.raise_for_status()
-    except httpx.HTTPError as e:
-        logger.error("Failed to forward chunk to %s: %s", node_address, e)
-        raise HTTPException(status_code=502, detail=f"Storage node error: {e}")
+    global node_index
+    chunk_infos: list[ChunkInfo] = []
 
-    # Record metadata
-    storage_response = response.json()
-    chunk_size = storage_response.get("size", len(content))
-    file_meta = FileMetadata(
-        filename=file.filename,
-        total_chunks=1,
-        chunks=[ChunkInfo(chunk_id=chunk_id, node_id=node_id, node_address=node_address, size=chunk_size)],
-    )
+    for chunk_id, chunk_data in chunks:
+        node_id      = node_ids[node_index % len(node_ids)]
+        node_address = nodes[node_id]
+        node_index  += 1
+        print("Chunk", chunk_id, "→", node_id)
+
+        try:
+            response = httpx.post(
+                f"{node_address}/store_chunk",
+                params={"chunk_id": chunk_id},
+                files={"file": (chunk_id, chunk_data, "application/octet-stream")},
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.error("Failed to forward chunk %s to %s: %s", chunk_id, node_address, e)
+            raise HTTPException(status_code=502, detail=f"Storage node error on chunk {chunk_id}: {e}")
+
+        stored_size = response.json().get("size", len(chunk_data))
+        chunk_infos.append(ChunkInfo(chunk_id=chunk_id, node_id=node_id, node_address=node_address, size=stored_size))
+
+    file_meta = FileMetadata(filename=file.filename, total_chunks=len(chunk_infos), chunks=chunk_infos)
     metadata.add_file(file_meta)
-    logger.info("Uploaded '%s' → node %s (%s)", file.filename, node_id, node_address)
+    logger.info("Uploaded '%s' → %d chunk(s) across %d node(s)", file.filename, len(chunk_infos), len(nodes))
 
     return {
         "message": "File uploaded",
-        "node_id": node_id,
-        "node": node_address,
-        "status": storage_response.get("status", "stored"),
-        "size": chunk_size,
+        "filename": file.filename,
+        "total_chunks": len(chunk_infos),
+        "size": len(content),
+        "chunks": [{"chunk_id": c.chunk_id, "node_id": c.node_id, "node": c.node_address} for c in chunk_infos],
     }
 
 
 @app.get("/download/{filename}")
 def download_file(filename: str):
-    """Proxy a file download from the storage node that holds its first chunk."""
+    """Reassemble all chunks from their respective storage nodes and stream the file."""
     file_meta = metadata.get_file(filename)
     if not file_meta:
         raise HTTPException(status_code=404, detail=f"File '{filename}' not found")
 
-    chunk = file_meta.chunks[0]
-    try:
-        response = httpx.get(
-            f"{chunk.node_address}/get_chunk/{chunk.chunk_id}",
-            follow_redirects=True,
-            timeout=30,
-        )
-        response.raise_for_status()
-    except httpx.HTTPError as e:
-        logger.error("Failed to fetch chunk from %s: %s", chunk.node_address, e)
-        raise HTTPException(status_code=502, detail=f"Storage node error: {e}")
+    assembled = b""
+    for chunk in file_meta.chunks:
+        try:
+            response = httpx.get(
+                f"{chunk.node_address}/get_chunk/{chunk.chunk_id}",
+                follow_redirects=True,
+                timeout=30,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.error("Failed to fetch chunk %s from %s: %s", chunk.chunk_id, chunk.node_address, e)
+            raise HTTPException(status_code=502, detail=f"Storage node error on chunk {chunk.chunk_id}: {e}")
+        assembled += response.content
 
     from fastapi.responses import Response
     return Response(
-        content=response.content,
+        content=assembled,
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

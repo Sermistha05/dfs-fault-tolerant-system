@@ -2,7 +2,21 @@ from pathlib import Path
 from typing import Generator
 
 
-def chunk_file(filepath: Path, chunk_size: int = 1024 * 1024) -> Generator[tuple[str, bytes], None, None]:
+CHUNK_SIZE = 256 * 1024  # 256 KB
+
+
+def split_bytes(filename: str, data: bytes, chunk_size: int = CHUNK_SIZE) -> list[tuple[str, bytes]]:
+    """
+    Split raw bytes into (chunk_id, data) pairs.
+    chunk_id format: <filename>_<index>  e.g. file_0, file_1
+    """
+    return [
+        (f"{filename}_{i}", data[off: off + chunk_size])
+        for i, off in enumerate(range(0, len(data), chunk_size))
+    ]
+
+
+def chunk_file(filepath: Path, chunk_size: int = CHUNK_SIZE) -> Generator[tuple[str, bytes], None, None]:
     """
     Read a file and yield (chunk_id, data) tuples.
     chunk_id format: <filename>_part_<index>  e.g. report.pdf_part_0

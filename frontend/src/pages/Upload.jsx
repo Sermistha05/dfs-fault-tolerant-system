@@ -240,9 +240,8 @@ export default function Upload() {
               </p>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-xs">
                 {[
-                  ['File',    result.node_id],
-                  ['Node',    result.node],
-                  ['Status',  result.status],
+                  ['File',    result.filename],
+                  ['Chunks',  result.total_chunks],
                   ['Size',    result.size != null ? formatBytes(result.size) : undefined],
                 ].filter(([, v]) => v != null).map(([label, value]) => (
                   <>
@@ -251,6 +250,17 @@ export default function Upload() {
                   </>
                 ))}
               </dl>
+              {result.chunks?.length > 0 && (
+                <div className="mt-3 flex flex-col gap-1">
+                  {result.chunks.map((c, i) => (
+                    <div key={i} className="flex gap-2 text-xs font-mono text-gray-400">
+                      <span className="text-indigo-400">{c.chunk_id}</span>
+                      <span>→</span>
+                      <span>{c.node_id}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </Card>
