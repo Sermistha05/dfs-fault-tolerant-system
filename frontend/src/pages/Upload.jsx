@@ -25,6 +25,23 @@ function fileIcon(name) {
   return '📁'
 }
 
+// ── replica badges ───────────────────────────────────────────────────────────
+function ReplicaBadges({ replicas }) {
+  if (!replicas?.length) return <span className="text-gray-300 dark:text-gray-600">N/A</span>
+  return (
+    <div className="flex flex-wrap gap-1">
+      {replicas.map((r) => (
+        <span
+          key={r.node_id}
+          className="inline-flex items-center gap-1 text-xs font-mono bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 border border-indigo-100 dark:border-indigo-800 rounded-md px-1.5 py-0.5"
+        >
+          {r.node_id}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 function ProgressBar({ pct }) {
   const color = pct === 100 ? 'bg-emerald-500' : 'bg-indigo-500'
@@ -251,14 +268,27 @@ export default function Upload() {
                 ))}
               </dl>
               {result.chunks?.length > 0 && (
-                <div className="mt-3 flex flex-col gap-1">
-                  {result.chunks.map((c, i) => (
-                    <div key={i} className="flex gap-2 text-xs font-mono text-gray-400">
-                      <span className="text-indigo-400">{c.chunk_id}</span>
-                      <span>→</span>
-                      <span>{c.node_id}</span>
-                    </div>
-                  ))}
+                <div className="mt-3 rounded-lg border border-indigo-100 dark:border-indigo-800 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-gray-400 border-b border-indigo-100 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-900/10">
+                        <th className="px-3 py-2 font-medium">Chunk</th>
+                        <th className="px-3 py-2 font-medium">Nodes</th>
+                        <th className="px-3 py-2 font-medium">Addresses</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.chunks.map((c) => (
+                        <tr key={c.chunk_id} className="border-b border-indigo-50 dark:border-indigo-800/50 last:border-0">
+                          <td className="px-3 py-2 font-mono text-indigo-400">{c.chunk_id}</td>
+                          <td className="px-3 py-2"><ReplicaBadges replicas={c.nodes} /></td>
+                          <td className="px-3 py-2 text-gray-400 font-mono">
+                            {c.nodes?.map(r => r.node_url).join(', ') ?? 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

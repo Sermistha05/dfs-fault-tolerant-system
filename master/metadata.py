@@ -24,8 +24,7 @@ def _write_json(path: Path, data: dict) -> None:
 @dataclass
 class ChunkInfo:
     chunk_id: str
-    node_id: str
-    node_address: str
+    replicas: List[Dict]  # [{"node_id": ..., "node_address": ...}, ...]
     size: int = 0
 
 
@@ -41,12 +40,22 @@ class MetadataStore:
 
     def __init__(self):
         self._nodes: Dict[str, str] = _read_json(NODES_FILE)  # node_id → address
-        raw_files = _read_json(FILES_FILE)                     # filename → serialised metadata
+        raw_files = _read_json(FILES_FILE)
+
         self._files: Dict[str, FileMetadata] = {
             name: FileMetadata(
                 filename=name,
                 total_chunks=v["total_chunks"],
-                chunks=[ChunkInfo(**c) for c in v["chunks"]],
+                chunks=[
+                    ChunkInfo(
+                        chunk_id=c["chunk_id"],
+                        replicas=c.get("replicas", [
+                            {"node_id": c.get("node_id"), "node_url": ""}
+                        ]),
+                        size=c.get("size", 0)
+                    )
+                    for c in v["chunks"]
+                ],
             )
             for name, v in raw_files.items()
         }
@@ -79,7 +88,7 @@ class MetadataStore:
 
     def get_files(self) -> Dict[str, dict]:
         return {
-            name: {"total_chunks": meta.total_chunks, "chunks": [vars(c) for c in meta.chunks]}
+            name: {"total_chunks": meta.total_chunks, "chunks": [{"chunk_id": c.chunk_id, "replicas": c.replicas, "size": c.size} for c in meta.chunks]}
             for name, meta in self._files.items()
         }
 
@@ -99,6 +108,6 @@ class MetadataStore:
 
     def _serialise_files(self) -> dict:
         return {
-            name: {"total_chunks": meta.total_chunks, "chunks": [vars(c) for c in meta.chunks]}
+            name: {"total_chunks": meta.total_chunks, "chunks": [{"chunk_id": c.chunk_id, "replicas": c.replicas, "size": c.size} for c in meta.chunks]}
             for name, meta in self._files.items()
         }

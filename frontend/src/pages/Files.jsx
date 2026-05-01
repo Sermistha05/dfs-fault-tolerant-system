@@ -32,6 +32,23 @@ function triggerBrowserDownload(blob, filename) {
   URL.revokeObjectURL(url)
 }
 
+// ── replica badges ───────────────────────────────────────────────────────────
+function ReplicaBadges({ replicas }) {
+  if (!replicas?.length) return <span className="text-gray-300 dark:text-gray-600">N/A</span>
+  return (
+    <div className="flex flex-wrap gap-1">
+      {replicas.map((r) => (
+        <span
+          key={r.node_id}
+          className="inline-flex items-center gap-1 text-xs font-mono bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 border border-indigo-100 dark:border-indigo-800 rounded-md px-1.5 py-0.5"
+        >
+          {r.node_id}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 function Skeleton() {
   return (
@@ -54,8 +71,8 @@ function ChunkDrawer({ chunks }) {
             <thead>
               <tr className="text-left text-gray-400 border-b border-indigo-100 dark:border-indigo-800">
                 <th className="px-4 py-2 font-medium">Chunk ID</th>
-                <th className="px-4 py-2 font-medium">Node</th>
-                <th className="px-4 py-2 font-medium">Address</th>
+                <th className="px-4 py-2 font-medium">Nodes</th>
+                <th className="px-4 py-2 font-medium">Addresses</th>
                 <th className="px-4 py-2 font-medium text-right">Size</th>
               </tr>
             </thead>
@@ -63,8 +80,10 @@ function ChunkDrawer({ chunks }) {
               {chunks.map((c) => (
                 <tr key={c.chunk_id} className="border-b border-indigo-50 dark:border-indigo-800/50 last:border-0">
                   <td className="px-4 py-2 font-mono text-indigo-500">{c.chunk_id}</td>
-                  <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{c.node_id}</td>
-                  <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{c.node_address}</td>
+                  <td className="px-4 py-2"><ReplicaBadges replicas={c.replicas} /></td>
+                  <td className="px-4 py-2 text-gray-500 dark:text-gray-400 font-mono">
+                    {c.replicas?.map(r => r.node_address).join(', ') ?? 'N/A'}
+                  </td>
                   <td className="px-4 py-2 text-right text-gray-500 dark:text-gray-400">{formatBytes(c.size)}</td>
                 </tr>
               ))}
@@ -105,11 +124,9 @@ function FileRow({ filename, meta, downloading, onDownload }) {
           {meta.total_chunks}
         </td>
 
-        {/* Node */}
+        {/* Nodes */}
         <td className="py-3 px-4">
-          <span className="text-xs font-mono text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-md px-2 py-0.5">
-            {meta.chunks[0]?.node_id ?? '—'}
-          </span>
+          <ReplicaBadges replicas={meta.chunks[0]?.replicas} />
         </td>
 
         {/* Actions */}
